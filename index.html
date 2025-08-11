@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wakacyjna Lista Pakowania</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #444;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        #item-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        #person-select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        #add-button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        #add-button:hover {
+            background-color: #0056b3;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        li {
+            display: flex;
+            align-items: center;
+            padding: 15px 10px;
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.2s;
+        }
+        li:last-child {
+            border-bottom: none;
+        }
+        li.completed span {
+            text-decoration: line-through;
+            color: #999;
+        }
+        .item-checkbox {
+            margin-right: 15px;
+            transform: scale(1.2);
+            cursor: pointer;
+        }
+        .item-text {
+            flex-grow: 1;
+        }
+        .person-label {
+            font-weight: bold;
+            margin-left: 15px;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            color: white;
+        }
+        .person-filip {
+            background-color: #28a745;
+        }
+        .person-kamil-ewa {
+            background-color: #fd7e14;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🌴 Wakacyjna Lista Pakowania 🌴</h1>
+    <div class="input-group">
+        <input type="text" id="item-input" placeholder="Co trzeba zabrać?">
+        <select id="person-select">
+            <option value="Filip">Filip</option>
+            <option value="Kamil & Ewa">Kamil & Ewa</option>
+        </select>
+        <button id="add-button">Dodaj</button>
+    </div>
+    <ul id="packing-list">
+        </ul>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+    const SUPABASE_URL = 'https://ahkkrzzylbjisntbgwkp.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoa2tyenp5bGJqaXNudGJnd2twIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjMyNTM4MTAsImV4cCI6MjAzODgyOTgxMH0.l71DK8Fx1g4_5m5y2n0pWJ431JjHrkB4vbB-aW6Y1K4';
+
+    // Inicjalizacja klienta Supabase
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Elementy DOM
+    const itemInput = document.getElementById('item-input');
+    const personSelect = document.getElementById('person-select');
+    const addButton = document.getElementById('add-button');
+    const packingList = document.getElementById('packing-list');
+
+    // Funkcja do pobierania i wyświetlania listy
+    async function fetchItems() {
+        const { data, error } = await supabase
+            .from('rzeczy_do_zabrania')
+            .select('*')
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            console.error('Błąd pobierania danych:', error);
+            return;
+        }
+
+        packingList.innerHTML = ''; // Wyczyść listę przed ponownym renderowaniem
+        data.forEach(item => {
+            const li = document.createElement('li');
+            li.dataset.id = item.id;
+            if (item.zabrane) {
+                li.classList.add('completed');
+            }
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.classList.add('item-checkbox');
+            checkbox.checked = item.zabrane;
+            checkbox.addEventListener('change', () => toggleCompleted(item.id, !item.zabrane));
+
+            const span = document.createElement('span');
+            span.classList.add('item-text');
+            span.textContent = item.nazwa;
+
+            const personLabel = document.createElement('span');
+            personLabel.textContent = item.kto;
+            personLabel.classList.add('person-label');
+            if (item.kto === 'Filip') {
+                personLabel.classList.add('person-filip');
+            } else {
+                personLabel.classList.add('person-kamil-ewa');
+            }
+
+            li.appendChild(checkbox);
+            li.appendChild(span);
+            li.appendChild(personLabel);
+            packingList.appendChild(li);
+        });
+    }
+
+    // Funkcja do dodawania nowego przedmiotu
+    async function addItem() {
+        const itemName = itemInput.value.trim();
+        const person = personSelect.value;
+
+        if (itemName === '') {
+            alert('Wpisz nazwę przedmiotu!');
+            return;
+        }
+
+        const { error } = await supabase
+            .from('rzeczy_do_zabrania')
+            .insert([{ nazwa: itemName, kto: person, zabrane: false }]);
+
+        if (error) {
+            console.error('Błąd dodawania przedmiotu:', error);
+        } else {
+            itemInput.value = '';
+            fetchItems(); // Odśwież listę
+        }
+    }
+
+    // Funkcja do zmiany statusu "zabrane"
+    async function toggleCompleted(id, newStatus) {
+        const { error } = await supabase
+            .from('rzeczy_do_zabrania')
+            .update({ zabrane: newStatus })
+            .eq('id', id);
+
+        if (error) {
+            console.error('Błąd aktualizacji statusu:', error);
+        } else {
+            fetchItems(); // Odśwież listę
+        }
+    }
+
+    // Nasłuchiwanie na zdarzenia
+    addButton.addEventListener('click', addItem);
+    itemInput.addEventListener('keypress', function(event) {
+        if (event.key === 'Enter') {
+            addItem();
+        }
+    });
+
+    // Początkowe pobranie danych po załadowaniu strony
+    fetchItems();
+
+</script>
+
+</body>
+</html>
