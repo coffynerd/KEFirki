@@ -5,17 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wakacyjna Lista Pakowania</title>
     <style>
+        /* --- GŁÓWNE ZMIANY TUTAJ --- */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 20px; /* Zapewnia odstęp na krawędziach ekranu */
             background-color: #f4f4f9;
             color: #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            /* Usunięto centrowanie w pionie, aby treść była od góry */
         }
+
         .container {
             width: 100%;
             max-width: 600px;
@@ -23,10 +22,15 @@
             padding: 30px;
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            margin: 0 auto; /* Centruje kontener w poziomie */
+            box-sizing: border-box; /* Ważne dla responsywności */
         }
+        /* --- KONIEC GŁÓWNYCH ZMIAN --- */
+
         h1 {
             text-align: center;
             color: #444;
+            margin-top: 0; /* Usunięcie domyślnego marginesu */
             margin-bottom: 20px;
         }
         .input-group {
@@ -40,12 +44,14 @@
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 16px;
+            min-width: 100px; /* Zapobiega zbytniemu kurczeniu się */
         }
         #person-select {
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 16px;
+            background-color: white; /* Ujednolicenie wyglądu */
         }
         #add-button {
             padding: 10px 20px;
@@ -71,16 +77,18 @@
             padding: 15px 10px;
             border-bottom: 1px solid #eee;
             transition: background-color 0.2s;
+            word-break: break-word; /* Zapobiega "wylewaniu" się długich słów */
         }
         li:last-child {
             border-bottom: none;
         }
-        li.completed span {
+        li.completed .item-text { /* Zmieniono selektor dla lepszej precyzji */
             text-decoration: line-through;
             color: #999;
         }
         .item-checkbox {
             margin-right: 15px;
+            flex-shrink: 0; /* Zapobiega kurczeniu się checkboxa */
             transform: scale(1.2);
             cursor: pointer;
         }
@@ -94,12 +102,34 @@
             border-radius: 15px;
             font-size: 12px;
             color: white;
+            flex-shrink: 0; /* Zapobiega kurczeniu się etykiety */
         }
         .person-filip {
             background-color: #28a745;
         }
         .person-kamil-ewa {
             background-color: #fd7e14;
+        }
+        #loading-message {
+            text-align: center;
+            padding: 20px;
+            color: #777;
+        }
+
+        /* --- NOWA SEKCJA: RESPONSIVE DESIGN DLA TELEFONÓW --- */
+        @media (max-width: 500px) {
+            body {
+                padding: 10px; /* Mniejszy odstęp na małych ekranach */
+            }
+            .container {
+                padding: 15px; /* Mniejszy padding wewnątrz kontenera */
+            }
+            .input-group {
+                flex-direction: column; /* Ustawia elementy jeden pod drugim */
+            }
+            h1 {
+                font-size: 1.5rem; /* Lekko mniejszy nagłówek */
+            }
         }
     </style>
 </head>
@@ -115,117 +145,123 @@
         </select>
         <button id="add-button">Dodaj</button>
     </div>
-    <ul id="packing-list">
-        </ul>
+    <div id="loading-message">Ładowanie listy...</div>
+    <ul id="packing-list"></ul>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
     const SUPABASE_URL = 'https://ahkkrzzylbjisntbgwkp.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoa2tyenp5bGJqaXNudGJnd2twIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjMyNTM4MTAsImV4cCI6MjAzODgyOTgxMH0.l71DK8Fx1g4_5m5y2n0pWJ431JjHrkB4vbB-aW6Y1K4';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoa2tyenp5bGJqaXNudGJnd2twIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5NDQ0MjUsImV4cCI6MjA3MDUyMDQyNX0.CptKP6C0yF_387wodfVdUjPvPDW0CSZn7e4kG6wtCFA';
 
-    // Inicjalizacja klienta Supabase
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Elementy DOM
     const itemInput = document.getElementById('item-input');
     const personSelect = document.getElementById('person-select');
     const addButton = document.getElementById('add-button');
     const packingList = document.getElementById('packing-list');
+    const loadingMessage = document.getElementById('loading-message');
 
-    // Funkcja do pobierania i wyświetlania listy
     async function fetchItems() {
-        const { data, error } = await supabase
+        loadingMessage.style.display = 'block';
+        packingList.innerHTML = '';
+
+        const { data, error } = await supabaseClient
             .from('rzeczy_do_zabrania')
             .select('*')
             .order('created_at', { ascending: true });
 
+        loadingMessage.style.display = 'none';
+
         if (error) {
-            console.error('Błąd pobierania danych:', error);
+            console.error('Błąd podczas pobierania danych:', error.message);
+            packingList.innerHTML = `<li>Wystąpił błąd: ${error.message}</li>`;
             return;
         }
 
-        packingList.innerHTML = ''; // Wyczyść listę przed ponownym renderowaniem
-        data.forEach(item => {
-            const li = document.createElement('li');
-            li.dataset.id = item.id;
-            if (item.zabrane) {
-                li.classList.add('completed');
-            }
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.classList.add('item-checkbox');
-            checkbox.checked = item.zabrane;
-            checkbox.addEventListener('change', () => toggleCompleted(item.id, !item.zabrane));
-
-            const span = document.createElement('span');
-            span.classList.add('item-text');
-            span.textContent = item.nazwa;
-
-            const personLabel = document.createElement('span');
-            personLabel.textContent = item.kto;
-            personLabel.classList.add('person-label');
-            if (item.kto === 'Filip') {
-                personLabel.classList.add('person-filip');
-            } else {
-                personLabel.classList.add('person-kamil-ewa');
-            }
-
-            li.appendChild(checkbox);
-            li.appendChild(span);
-            li.appendChild(personLabel);
-            packingList.appendChild(li);
-        });
+        if (data.length === 0) {
+            packingList.innerHTML = `<li>Lista jest pusta. Dodaj pierwszy przedmiot!</li>`;
+        } else {
+             data.forEach(renderItem);
+        }
     }
 
-    // Funkcja do dodawania nowego przedmiotu
+    function renderItem(item) {
+        const li = document.createElement('li');
+        li.dataset.id = item.id;
+        if (item.zabrane) {
+            li.classList.add('completed');
+        }
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.classList.add('item-checkbox');
+        checkbox.checked = item.zabrane;
+        checkbox.addEventListener('change', () => toggleCompleted(item.id, !item.zabrane));
+
+        const span = document.createElement('span');
+        span.classList.add('item-text');
+        span.textContent = item.nazwa;
+
+        const personLabel = document.createElement('span');
+        personLabel.textContent = item.kto;
+        personLabel.classList.add('person-label');
+        personLabel.classList.add(item.kto === 'Filip' ? 'person-filip' : 'person-kamil-ewa');
+
+        li.appendChild(checkbox);
+        li.appendChild(span);
+        li.appendChild(personLabel);
+        packingList.appendChild(li);
+    }
+
     async function addItem() {
         const itemName = itemInput.value.trim();
-        const person = personSelect.value;
+        if (itemName === '') return;
 
-        if (itemName === '') {
-            alert('Wpisz nazwę przedmiotu!');
-            return;
-        }
-
-        const { error } = await supabase
+        const { data, error } = await supabaseClient
             .from('rzeczy_do_zabrania')
-            .insert([{ nazwa: itemName, kto: person, zabrane: false }]);
+            .insert([{ nazwa: itemName, kto: personSelect.value }])
+            .select()
+            .single();
 
         if (error) {
-            console.error('Błąd dodawania przedmiotu:', error);
+            console.error('Błąd dodawania przedmiotu:', error.message);
+            alert(`Nie udało się dodać przedmiotu: ${error.message}`);
         } else {
+            if (packingList.querySelector('li')?.textContent === 'Lista jest pusta. Dodaj pierwszy przedmiot!') {
+                packingList.innerHTML = '';
+            }
+            renderItem(data);
             itemInput.value = '';
-            fetchItems(); // Odśwież listę
+            itemInput.focus();
         }
     }
 
-    // Funkcja do zmiany statusu "zabrane"
     async function toggleCompleted(id, newStatus) {
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('rzeczy_do_zabrania')
             .update({ zabrane: newStatus })
             .eq('id', id);
 
         if (error) {
-            console.error('Błąd aktualizacji statusu:', error);
+            console.error('Błąd aktualizacji:', error.message);
         } else {
-            fetchItems(); // Odśwież listę
+            const li = packingList.querySelector(`[data-id="${id}"]`);
+            li.classList.toggle('completed', newStatus);
+            // Zmieniamy styl bezpośrednio w elemencie, który już istnieje, zamiast odświeżać całą listę
+            const textSpan = li.querySelector('.item-text');
+            if (textSpan) {
+                textSpan.style.textDecoration = newStatus ? 'line-through' : 'none';
+                textSpan.style.color = newStatus ? '#999' : 'inherit';
+            }
         }
     }
 
-    // Nasłuchiwanie na zdarzenia
     addButton.addEventListener('click', addItem);
-    itemInput.addEventListener('keypress', function(event) {
-        if (event.key === 'Enter') {
-            addItem();
-        }
-    });
+    itemInput.addEventListener('keypress', (e) => e.key === 'Enter' && addItem());
 
-    // Początkowe pobranie danych po załadowaniu strony
-    fetchItems();
+    document.addEventListener('DOMContentLoaded', fetchItems);
 
 </script>
 
